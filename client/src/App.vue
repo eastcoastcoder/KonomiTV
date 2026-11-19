@@ -10,7 +10,21 @@
 </template>
 <script lang="ts" setup>
 
+import { watch } from 'vue';
+import { useLocale } from 'vuetify';
+
 import Snackbars from '@/components/Snackbars.vue';
+import useSettingsStore from '@/stores/SettingsStore';
+
+const settingsStore = useSettingsStore();
+const vuetifyLocale = useLocale();
+
+// 日付ピッカーなどの Vuetify 部品と、文書の言語を表示言語に合わせる
+watch(() => settingsStore.settings.ui_language, (language) => {
+    const isEnglish = language === 'English';
+    vuetifyLocale.current.value = isEnglish ? 'en' : 'ja';
+    document.documentElement.lang = isEnglish ? 'en' : 'ja';
+}, { immediate: true });
 
 </script>
 <style lang="scss">

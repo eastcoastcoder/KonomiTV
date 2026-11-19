@@ -34,6 +34,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 
 import OfflineDownloadBadge from '@/components/OfflineDownloadBadge.vue';
+import { useUiText } from '@/locales/useUiText';
+import useSettingsStore from '@/stores/SettingsStore';
 import Utils from '@/utils';
 
 // Props の定義
@@ -54,6 +56,8 @@ const emit = defineEmits<{
 
 const router = useRouter();
 const route = useRoute();
+const settingsStore = useSettingsStore();
+const { t } = useUiText();
 
 // 検索入力フィールドの参照
 const searchInput = ref<HTMLInputElement | null>(null);
@@ -80,17 +84,22 @@ const searchQuery = computed({
 // 番組表ページでは検索ボタンは表示するが、設定/ログイン/登録/キャプチャページでは非表示
 const showSearchButton = computed(() => {
     const path = route.path;
-    return !path.startsWith('/settings') && !path.startsWith('/login') && !path.startsWith('/register');
+    // プレイリストをテレビホームにしているときは、ヘッダー検索がサーバーの番組検索へ飛ばないようにする
+    if ((path === '/tv' || path === '/tv/') && settingsStore.settings.m3u_playlist_url.trim() !== '') {
+        return false;
+    }
+    return !path.startsWith('/settings') && !path.startsWith('/login') && !path.startsWith('/register') &&
+        !path.startsWith('/tv/playlist');
 });
 
 // 検索プレースホルダー
 const searchPlaceholder = computed(() => {
     if (route.path.startsWith('/captures')) {
-        return 'キャプチャを検索...';
+        return t('search.captures');
     }
     return isVideoSection(route.path)
-        ? '録画番組やシリーズを検索...'
-        : '放送予定の番組を検索...';
+        ? t('search.videosAndSeries')
+        : t('search.programs');
 });
 
 // 動画セクションかどうかを判定

@@ -41,7 +41,7 @@
                 <v-btn variant="flat" size="small" class="timetable-program-cell__action-button"
                     @click.stop="$emit('show-detail')">
                     <Icon icon="fluent:info-12-regular" width="16px" />
-                    <span>番組詳細</span>
+                    <span>{{ t('timetable.programDetails') }}</span>
                 </v-btn>
                 <!-- 録画予約ボタン: 予約なしの場合は追加、予約ありの場合は有効/無効切替 -->
                 <v-btn variant="flat" size="small"
@@ -50,7 +50,7 @@
                         'timetable-program-cell__action-button--reserved': hasReservation && !isReservationDisabled,
                         'timetable-program-cell__action-button--disabled-reservation': isReservationDisabled,
                     }"
-                    v-if="!isPast"
+                    v-if="!isPast && showReservationButton !== false"
                     @click.stop="onQuickReserve">
                     <Icon :icon="reservationButtonIcon" width="16px" />
                     <span>{{ reservationButtonLabel }}</span>
@@ -63,6 +63,7 @@
 
 import { computed, nextTick, ref, watch } from 'vue';
 
+import { useUiText } from '@/locales/useUiText';
 import { ITimeTableChannel, ITimeTableProgram } from '@/services/Programs';
 import useSettingsStore from '@/stores/SettingsStore';
 import useTimeTableStore from '@/stores/TimeTableStore';
@@ -135,6 +136,8 @@ const props = defineProps<{
     isNextReserved?: boolean;  // 次の番組も予約されているか (border 重複回避用)
     // ウィンドウリサイズ時に再計算をトリガーするためのカウンター (親から受け取る)
     resizeTrigger: number;
+    // false のときは録画予約ボタンを出さない (XMLTV の番組表)
+    showReservationButton?: boolean;
 }>();
 
 // Emits
@@ -146,6 +149,7 @@ const emit = defineEmits<{
 
 // ストア
 const settingsStore = useSettingsStore();
+const { t } = useUiText();
 const timetableStore = useTimeTableStore();
 
 // 状態
@@ -266,7 +270,7 @@ const reservationButtonLabel = computed(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _trigger = props.resizeTrigger;
     if (!hasReservation.value) {
-        return '録画予約';
+        return t('timetable.reserve');
     }
     // チャンネル幅が狭い画面では短縮表示
     // - スマホ縦画面: 「標準」または「狭め」の場合
@@ -277,9 +281,9 @@ const reservationButtonLabel = computed(() => {
         (Utils.isSmartphoneVertical() && isNotWide) ||
         ((Utils.isSmartphoneHorizontal() || Utils.isTabletVertical()) && isNarrow);
     if (isReservationDisabled.value) {
-        return shouldShorten ? '有効化' : '予約を有効化';
+        return shouldShorten ? t('timetable.enableShort') : t('timetable.enableReservation');
     }
-    return shouldShorten ? '無効化' : '予約を無効化';
+    return shouldShorten ? t('timetable.disableShort') : t('timetable.disableReservation');
 });
 
 /**

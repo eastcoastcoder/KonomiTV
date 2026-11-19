@@ -41,6 +41,12 @@ export interface IChannel {
     is_subchannel: boolean;
     is_radiochannel: boolean;
     is_watchable: boolean;
+    // M3U プレイリストのチャンネルだけが持つ。サーバーのチャンネル API には無い
+    stream_url?: string;
+    // M3U の tvg-logo。無いときは null。サーバーのチャンネルには無い
+    logo_url?: string | null;
+    // M3U の group-title。空のときは視聴画面のチャンネル一覧が「その他」と表示する
+    playlist_group?: string;
 }
 
 /** 現在放送中のチャンネル情報を表すインターフェイス */

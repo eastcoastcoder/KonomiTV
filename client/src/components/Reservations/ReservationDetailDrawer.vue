@@ -13,7 +13,7 @@
                     :class="{ 'reservation-detail-drawer__tab--active': activeTab === 'info' }"
                     @click="activeTab = 'info'">
                     <Icon icon="fluent:info-12-regular" width="20px" height="20px" />
-                    <span class="reservation-detail-drawer__tab-text">番組情報 {{ !showSettingsTab ? '（終了済み）' : '' }}</span>
+                    <span class="reservation-detail-drawer__tab-text">{{ programInfoTabLabel }}</span>
                 </div>
                 <div v-if="showSettingsTab" v-ripple class="reservation-detail-drawer__tab"
                     :class="{ 'reservation-detail-drawer__tab--active': activeTab === 'settings' }"
@@ -48,7 +48,7 @@
                     </span>
                 </div>
                 <!-- Mirakurun バックエンド時の通知 -->
-                <div v-if="!isEDCBBackend && !isPastProgram && !hasRealReservation" class="status-banner status-banner--info mb-4">
+                <div v-if="!viewOnly && !isEDCBBackend && !isPastProgram && !hasRealReservation" class="status-banner status-banner--info mb-4">
                     <Icon icon="fluent:info-16-regular" class="status-banner__icon" />
                     <span class="status-banner__text">
                         録画予約機能は EDCB バックエンド選択時のみ利用できます。
@@ -73,7 +73,7 @@
         </div>
 
         <!-- フッター -->
-        <div class="reservation-detail-drawer__footer" v-if="!isPastProgram">
+        <div class="reservation-detail-drawer__footer" v-if="!isPastProgram && !viewOnly">
             <div class="reservation-detail-drawer__actions">
                 <!-- 実際の予約がある場合: 削除ボタン -->
                 <v-btn v-if="hasRealReservation" class="px-3" variant="text" @click="handleDelete">
@@ -99,7 +99,7 @@
             <div class="reservation-detail-drawer__actions">
                 <v-btn class="px-3" variant="text" @click="handleClose">
                     <Icon icon="fluent:dismiss-16-regular" width="20px" height="20px" />
-                    <span class="ml-1">閉じる</span>
+                    <span class="ml-1">{{ t('drawer.close') }}</span>
                 </v-btn>
             </div>
         </div>
@@ -189,6 +189,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 
 import ReservationProgramInfo from '@/components/Reservations/ReservationProgramInfo.vue';
 import ReservationRecordingSettings from '@/components/Reservations/ReservationRecordingSettings.vue';
+import { useUiText } from '@/locales/useUiText';
 import Message from '@/message';
 import { type IChannel } from '@/services/Channels';
 import { type IProgram } from '@/services/Programs';
@@ -206,6 +207,8 @@ const props = defineProps<{
     channel?: IChannel | null;
     // 過去番組かどうか（true の場合、予約関連 UI は非表示）
     isPastProgram?: boolean;
+    // 番組情報の閲覧だけを行い、サーバーの予約 API を呼ばない
+    viewOnly?: boolean;
     // ドロワーの表示状態
     modelValue: boolean;
 }>();
@@ -275,11 +278,18 @@ const isEDCBBackend = computed(() => serverSettingsStore.is_loaded === true && s
 // - 実際の予約がある場合: 表示 (既存予約の設定編集)
 // - mock の予約がある場合 (予約なし): 表示 (新規予約前の設定カスタマイズ)
 // - 過去番組の場合: 非表示
-const showSettingsTab = computed(() => hasReservation.value && !props.isPastProgram);
+const showSettingsTab = computed(() => hasReservation.value && !props.isPastProgram && props.viewOnly !== true);
+const { t } = useUiText();
+const programInfoTabLabel = computed(() => {
+    if (showSettingsTab.value === false && props.viewOnly !== true) {
+        return t('drawer.programInfoEnded');
+    }
+    return t('drawer.programInfo');
+});
 
 // 予約追加ボタンを表示するかどうか
 // mock の予約がある場合 (実際には予約なし) かつ過去番組でない場合に表示
-const showAddButton = computed(() => isMockReservation.value && !props.isPastProgram);
+const showAddButton = computed(() => isMockReservation.value && !props.isPastProgram && props.viewOnly !== true);
 
 // キーワード自動予約かどうか
 const isKeywordAutoReservation = computed(() => {
@@ -303,12 +313,25 @@ const isPartialRecording = computed(() => recordingAvailability.value === 'Parti
 const isUnavailableRecording = computed(() => recordingAvailability.value === 'Unavailable');
 
 // サーバー設定を取得し、EDCB バックエンドの場合は録画設定プリセットも取得する
-onMounted(async () => {
+// XMLTV の番組表では予約操作を出さないため、サーバーには接続しない
+async function loadReservationServerContext(): Promise<void> {
+    if (props.viewOnly === true) {
+        return;
+    }
     await serverSettingsStore.fetchServerSettingsOnce();
     // EDCB バックエンドの場合のみプリセットを取得
-    if (isEDCBBackend.value) {
+    if (isEDCBBackend.value && presets.value === null) {
         presets.value = await Reservations.fetchRecordingPresets();
     }
+}
+
+onMounted(async () => {
+    await loadReservationServerContext();
+});
+
+// 同じドロワーを XMLTV の番組表から通常の番組表へ切り替えたときは、ここでサーバー設定を取得する
+watch(() => props.viewOnly, async () => {
+    await loadReservationServerContext();
 });
 
 // ドロワーが開かれた時の処理

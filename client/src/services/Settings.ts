@@ -37,12 +37,15 @@ export interface IClientSettings {
     // lshaped_screen_crop_x_position: 同期無効
     // lshaped_screen_crop_y_position: 同期無効
     // lshaped_screen_crop_zoom_origin: 同期無効
+    // ui_language: 同期無効
     pinned_channel_ids: string[];
     timetable_channel_width: TimeTableSizeOption;
     timetable_hour_height: TimeTableSizeOption;
     timetable_hover_expand: boolean;
     timetable_dim_shopping_programs: boolean;
     timetable_genre_colors: ITimeTableGenreColors;
+    xmltv_epg_url: string;
+    m3u_playlist_url: string;
     show_player_background_image: boolean;
     use_pure_black_player_background: boolean;
     tv_channel_sort_by_jikkyo_force: boolean;

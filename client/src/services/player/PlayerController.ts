@@ -230,6 +230,20 @@ class PlayerController {
 
 
     /**
+     * いまのチャンネルが M3U プレイリストの HLS かどうか
+     * プレイリストのチャンネルはサーバーのライブストリーム API を使わない
+     * @returns 外部 HLS を再生するとき true
+     */
+    private isExternalLiveStream(): boolean {
+        if (this.playback_mode !== 'Live') {
+            return false;
+        }
+        const stream_url = useChannelsStore().channel.current.stream_url;
+        return typeof stream_url === 'string' && stream_url !== '';
+    }
+
+
+    /**
      * DPlayer と PlayerManager を初期化し、再生準備を行う
      */
     public async init(options: {
@@ -367,6 +381,9 @@ class PlayerController {
             lang: 'ja-jp',
             // ライブモード (ビデオ視聴では無効)
             live: this.playback_mode === 'Live' ? true : false,
+            // プレイリストの HLS は、再生開始時に末尾へシークしない
+            // 末尾へ合わせるとすぐ ended になり、ブラウザが次のチャンネルへ進めてしまう
+            syncWhenPlayingLive: this.isExternalLiveStream() === false,
             // ライブモードで同期する際の最小バッファサイズ
             liveSyncMinBufferSize: this.live_playback_buffer_seconds - 0.1,
             // ループ再生 (ライブ視聴では無効)
@@ -416,6 +433,18 @@ class PlayerController {
 
                 // ライブ視聴: チャンネル情報がセットされているはず
                 if (this.playback_mode === 'Live') {
+                    // M3U プレイリストは、サーバーでエンコードせず配信元の HLS をそのまま再生する
+                    const external_stream_url = channels_store.channel.current.stream_url;
+                    if (typeof external_stream_url === 'string' && external_stream_url !== '') {
+                        return {
+                            quality: [{
+                                name: 'HLS',
+                                type: 'hls',
+                                url: external_stream_url,
+                            }],
+                            defaultQuality: 'HLS',
+                        };
+                    }
                     // ライブストリーミング API のベース URL
                     const streaming_api_base_url = `${Utils.api_base_url}/streams/live/${channels_store.channel.current.display_channel_id}`;
                     // ラジオチャンネルの場合
@@ -697,12 +726,14 @@ class PlayerController {
                     if (this.playback_mode === 'Live') {
                         // ライブ視聴: コメントを送信する
                         // PlayerManager に登録されているはずの LiveCommentManager を探し、コメントを送信する
+                        // プレイリスト視聴にはニコニコ実況のコメント送信先がない
                         for (const player_manager of this.player_managers) {
                             if (player_manager instanceof LiveCommentManager) {
                                 player_manager.sendComment(options);  // options.success() は LiveCommentManager 側で呼ばれる
                                 return;
                             }
                         }
+                        options.error('このチャンネルにはコメントできません。');
                     } else {
                         // ビデオ視聴: 過去ログにはコメントできないのでエラーを返す
                         options.error('録画番組にはコメントできません。');
@@ -791,15 +822,21 @@ class PlayerController {
                     preferManagedMediaSource: true,
                     // startPosition に視聴履歴などから求めた再生位置を渡し、ロード開始時点で正しい Media Sequence を選択させる
                     // これを指定しないと manifest 解析後に sequence=0 からフラグメント取得が始まってしまう
-                    startPosition: seek_seconds,
+                    // プレイリストのライブ HLS は、先頭ではなく配信の最新位置から再生する
+                    startPosition: this.isExternalLiveStream() === true ? -1 : seek_seconds,
                     // 通常の録画再生では先読みを30秒までに収め、再生位置の多重化 TS をサーバーの保持範囲内に残す
                     // VideoStream は約6秒の取得済みセグメントを最大9件保持するため、セグメント境界を含めても余裕がある
                     // これにより、その場で副音声へ切り替えた際に同じ TS を再利用できる (保存再生は hls.js の既定値を使う)
                     maxMaxBufferLength: player_store.is_offline_playback === true ? Hls.DefaultConfig.maxMaxBufferLength : 30,
-                    // 通常再生ではサーバー側のエンコード済み範囲と連携し、保存再生では完結した HLS を標準実装で扱う
-                    // 保存版には buffer.m3u8 の SSE がないため、CustomBufferController を使うとシーク時に存在しない URL へ接続してしまう
+                    // 通常再生ではサーバー側のエンコード済み範囲と連携し、保存再生とプレイリストの HLS は標準実装で扱う
+                    // 保存版と外部 HLS には buffer.m3u8 の SSE がないため、CustomBufferController を使うと存在しない URL へ接続してしまう
                     // @ts-ignore
-                    bufferController: player_store.is_offline_playback === true ? Hls.DefaultConfig.bufferController : CustomBufferController,
+                    bufferController: player_store.is_offline_playback === true || this.isExternalLiveStream() === true
+                        ? Hls.DefaultConfig.bufferController
+                        : CustomBufferController,
+                    // プレイリストのライブ HLS は、終わらない配信として再生する
+                    liveDurationInfinity: this.isExternalLiveStream() === true ? true : Hls.DefaultConfig.liveDurationInfinity,
+                    lowLatencyMode: this.isExternalLiveStream() === true ? false : Hls.DefaultConfig.lowLatencyMode,
                     // プレイリスト / セグメントのリクエスト時のタイムアウトを回避する
                     manifestLoadPolicy: {
                         default: {
@@ -1085,7 +1122,8 @@ class PlayerController {
             console.warn('\u001b[31m[PlayerController] PlayerRestartRequired event received. Message: ', event.message);
 
             // ライブ視聴: iOS 17.0 以下で mpegts.js がサポートされていない場合は再起動できない
-            if (this.playback_mode === 'Live' && mpegts.isSupported() !== true) {  // mpegts.js 非対応環境では undefined が返る
+            // プレイリストの HLS は mpegts.js を使わないので、この制限には当てはめない
+            if (this.playback_mode === 'Live' && this.isExternalLiveStream() === false && mpegts.isSupported() !== true) {  // mpegts.js 非対応環境では undefined が返る
                 console.warn('\u001b[31m[PlayerController] PlayerRestartRequired event received, but mpegts.js is not supported. Ignored.');
                 // iOS 17.0 以下は mpegts.js がサポートされていないため、再生できない
                 this.player?.notice('iOS (Safari) 17.0 以下での視聴には対応していません。速やかに iOS を 17.1 以降に更新してください。', -1, undefined, '#FF6F6A');
@@ -1207,7 +1245,14 @@ class PlayerController {
         // 各 PlayerManager を初期化・登録
         // ライブ視聴とビデオ視聴で必要な PlayerManager が異なる
         // この初期化順序は意図的 (入れ替えても動作するものもあるが、CaptureManager は KeyboardShortcutManager より先に初期化する必要がある)
-        if (this.playback_mode === 'Live') {
+        if (this.playback_mode === 'Live' && this.isExternalLiveStream() === true) {
+            // プレイリスト視聴は、サーバーのライブストリーム・実況・データ放送・キャプチャを使わない
+            this.player_managers = [
+                new DocumentPiPManager(this.player, this.playback_mode),
+                new KeyboardShortcutManager(this.player, this.playback_mode),
+                new MediaSessionManager(this.player, this.playback_mode),
+            ];
+        } else if (this.playback_mode === 'Live') {
             // ライブ視聴時に設定する PlayerManager
             this.player_managers = [
                 new LiveEventManager(this.player),
@@ -1412,6 +1457,46 @@ class PlayerController {
 
             // ライブ視聴時のみ
             if (this.playback_mode === 'Live') {
+
+                // プレイリストの HLS は、mpegts.js 向けのバッファ調整を通さず再生を始める
+                if (this.isExternalLiveStream() === true) {
+                    player_store.is_loading = true;
+                    player_store.is_background_display = true;
+                    let on_canplay_called = false;
+                    const on_canplay = () => {
+                        if (this.player === null || on_canplay_called === true) {
+                            return;
+                        }
+                        on_canplay_called = true;
+                        this.player.video.oncanplay = null;
+                        this.player.video.oncanplaythrough = null;
+                        player_store.is_loading = false;
+                        player_store.is_video_buffering = false;
+                        player_store.is_background_display = false;
+                    };
+                    this.player.video.oncanplay = on_canplay;
+                    this.player.video.oncanplaythrough = on_canplay;
+
+                    // MSE が映像形式を受け取れないときは、同じチャンネルをやり直しても結果は変わらない
+                    this.player.plugins.hls?.on(Hls.Events.ERROR, (_event, data) => {
+                        if (this.player === null || data.fatal !== true) {
+                            return;
+                        }
+                        this.player.plugins.hls?.stopLoad();
+                        this.player.pause();
+                        player_store.is_loading = false;
+                        player_store.is_video_buffering = false;
+                        if (data.details === Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR) {
+                            this.player.notice('このブラウザでは、このチャンネルの映像形式を再生できません。Safari で開くと再生できる場合があります。',
+                                -1, undefined, '#FF6F6A');
+                            return;
+                        }
+                        console.error('\u001b[31m[PlayerController] External HLS error:', data.type, data.details);
+                        this.player.notice('再生を開始できませんでした。', undefined, undefined, '#FF6F6A');
+                    });
+                    this.player.play();
+                    return;
+                }
 
                 // mpeg2toh264 によるオリジナル画質再生時のみの専用処理
                 if (this.player.type === 'mpeg2toh264' && this.player.plugins.mpeg2toh264) {

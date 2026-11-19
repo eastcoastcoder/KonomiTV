@@ -3,7 +3,9 @@
         <HeaderBar />
         <main>
             <Navigation />
-            <div class="channels-container channels-container--home" :class="{'channels-container--loading': is_loading}">
+            <!-- M3U の URL があるときは、サーバーのチャンネル一覧を呼ばずにプレイリストをテレビホームとして出す -->
+            <Playlist v-if="usesPlaylist" />
+            <div class="channels-container channels-container--home" :class="{'channels-container--loading': is_loading}" v-else>
                 <SPHeaderBar />
                 <div class="channels-tab">
                     <div class="channels-tab__buttons" :style="{
@@ -133,6 +135,7 @@ import { ILiveChannel } from '@/services/Channels';
 import useChannelsStore from '@/stores/ChannelsStore';
 import useSettingsStore from '@/stores/SettingsStore';
 import Utils, { ChannelUtils, ProgramUtils } from '@/utils';
+import Playlist from '@/views/TV/Playlist.vue';
 
 export default defineComponent({
     name: 'TV-Home',
@@ -140,6 +143,7 @@ export default defineComponent({
         SPHeaderBar,
         HeaderBar,
         Navigation,
+        Playlist,
         Swiper,
         SwiperSlide,
     },
@@ -172,6 +176,12 @@ export default defineComponent({
     },
     computed: {
         ...mapStores(useChannelsStore, useSettingsStore),
+
+        // プレイリストの URL があるときは、テレビホームを M3U のチャンネル一覧にする
+        // サーバーの /channels は呼ばない。受信環境がないときにエラーを出さず、同じ /tv/ で再生まで進める
+        usesPlaylist(): boolean {
+            return this.settingsStore.settings.m3u_playlist_url.trim() !== '';
+        },
     },
     watch: {
         active_tab_index() {
@@ -184,6 +194,12 @@ export default defineComponent({
     },
     // 開始時に実行
     async mounted() {
+
+        // プレイリストをテレビホームにしているときは、チャンネル API も定期更新も走らせない
+        if (this.usesPlaylist === true) {
+            this.is_loading = false;
+            return;
+        }
 
         // ピン留めされているチャンネルがないなら、タブを地デジタブに切り替える
         // ピン留めができる事を示唆するためにピン留めタブ自体は残す

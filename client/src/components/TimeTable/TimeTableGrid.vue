@@ -30,6 +30,7 @@
                         :width="channelWidth"
                         :height="channelHeaderHeight"
                         :resizeTrigger="windowResizeCounter"
+                        :plain="viewOnly === true"
                     />
                     </div>
                 </div>
@@ -75,6 +76,7 @@
                                 :is36HourDisplay="props.is36HourDisplay"
                                 :isNextReserved="isNextProgramReserved(channelData, program, false)"
                                 :resizeTrigger="windowResizeCounter"
+                                :showReservationButton="viewOnly !== true"
                                 @click="onProgramClick(program)"
                                 @show-detail="$emit('show-program-detail', program.id, channelData.channel, program)"
                                 @quick-reserve="$emit('quick-reserve', program.id, channelData.channel, program)"
@@ -102,6 +104,7 @@
                                         :is36HourDisplay="props.is36HourDisplay"
                                         :isNextReserved="isNextProgramReserved(channelData, program, true)"
                                         :resizeTrigger="windowResizeCounter"
+                                        :showReservationButton="viewOnly !== true"
                                         @click="onProgramClick(program)"
                                         @show-detail="$emit('show-program-detail', program.id, subchannel.channel, program)"
                                         @quick-reserve="$emit('quick-reserve', program.id, subchannel.channel, program)"
@@ -163,6 +166,8 @@ const props = defineProps<{
     is36HourDisplay: boolean;
     canGoPreviousDay: boolean;
     canGoNextDay: boolean;
+    // 番組の閲覧だけを行い、視聴画面や録画予約へ進まない
+    viewOnly?: boolean;
 }>();
 
 // Emits

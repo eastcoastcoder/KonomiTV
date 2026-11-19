@@ -3,30 +3,37 @@
         <v-btn class="bottom-navigation-button" to="/tv/"
             :class="{'v-btn--active': $route.path.startsWith('/tv')}">
             <Icon icon="fluent:tv-20-regular" width="30px" />
-            <span class="mt-1">テレビをみる</span>
+            <span class="mt-1">{{ t('bottom.tv') }}</span>
         </v-btn>
         <v-btn class="bottom-navigation-button" to="/videos/"
             :class="{'v-btn--active': $route.path.startsWith('/videos')}">
             <Icon icon="fluent:movies-and-tv-20-regular" width="30px" />
-            <span class="mt-1">ビデオをみる</span>
+            <span class="mt-1">{{ t('bottom.videos') }}</span>
         </v-btn>
         <v-btn class="bottom-navigation-button" to="/reservations/"
             :class="{'v-btn--active': $route.path.startsWith('/reservations')}">
             <Icon icon="fluent:timer-16-regular" width="30px" />
-            <span class="mt-1">録画予約</span>
+            <span class="mt-1">{{ t('bottom.reservations') }}</span>
         </v-btn>
         <v-btn class="bottom-navigation-button" to="/captures/"
             :class="{'v-btn--active': $route.path.startsWith('/captures')}">
             <Icon icon="fluent:image-multiple-24-regular" width="30px" />
-            <span class="mt-1">キャプチャ</span>
+            <span class="mt-1">{{ t('bottom.captures') }}</span>
         </v-btn>
         <v-btn class="bottom-navigation-button" to="/mypage/"
             :class="{'v-btn--active': $route.path.startsWith('/mypage')}">
             <Icon icon="fluent:person-20-regular" width="30px" />
-            <span class="mt-1">マイページ</span>
+            <span class="mt-1">{{ t('bottom.mypage') }}</span>
         </v-btn>
     </v-bottom-navigation>
 </template>
+<script lang="ts" setup>
+
+import { useUiText } from '@/locales/useUiText';
+
+const { t } = useUiText();
+
+</script>
 <style lang="scss">
 
 .bottom-navigation-container .v-btn--active > .v-btn__overlay {
@@ -58,9 +65,12 @@
         padding: 0 !important;
         color: rgb(var(--v-theme-text-darken-1)) !important;
         font-weight: bold;
-        // 通常は 10.5px とし、ボタンの幅 ((画面幅 - 左右の余白 16px) / 5) に最も長い6文字のラベル (「テレビをみる」など) が
+        // 通常は 10.5px とし、ボタンの幅 ((画面幅 - 左右の余白 16px) / 5) に最も長いラベルが
         // 収まらない狭い画面では、ラベルが2行に折り返さないよう、ボタンの幅に合わせて文字を小さくする
-        font-size: min(10.5px, calc((100vw - 16px) / 5 / 6.4));
+        // 英語の Recordings は日本語の6文字より幅が広いため、縮小の基準を少し広げる
+        font-size: min(10.5px, calc((100vw - 16px) / 5 / 7.2));
+        line-height: 1.15;
+        white-space: nowrap;
 
         &.v-btn--active {
             color: rgb(var(--v-theme-primary)) !important;

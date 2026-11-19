@@ -113,38 +113,46 @@ class MediaSessionManager implements PlayerManager {
                 this.player.seek(details.seekTime!);
             });
         }
-        // 前のトラックに移動
-        navigator.mediaSession.setActionHandler('previoustrack', async () => {
-            // ライブ視聴: 前のチャンネルに切り替え
-            if (this.playback_mode === 'Live') {
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: channels_store.channel.previous.program_present?.title ?? '放送休止',
-                    artist: channels_store.channel.previous.name,
-                    artwork: artwork,
-                });
-                // ルーティングを前のチャンネルに置き換える
-                await router.push({path: `/tv/watch/${channels_store.channel.previous.display_channel_id}`});
-            // ビデオ視聴: シリーズ番組の前の話数に切り替え
-            } else {
-                // TODO: 未実装
-            }
-        });
-        // 次のトラックに移動
-        navigator.mediaSession.setActionHandler('nexttrack', async () => {  // 次のチャンネルに切り替え
-            // ライブ視聴: 次のチャンネルに切り替え
-            if (this.playback_mode === 'Live') {
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: channels_store.channel.next.program_present?.title ?? '放送休止',
-                    artist: channels_store.channel.next.name,
-                    artwork: artwork,
-                });
-                // ルーティングを次のチャンネルに置き換える
-                await router.push({path: `/tv/watch/${channels_store.channel.next.display_channel_id}`});
-            // ビデオ視聴: シリーズ番組の次の話数に切り替え
-            } else {
-                // TODO: 未実装
-            }
-        });
+        // プレイリストの再生が失敗したり終わったりすると、ブラウザが previoustrack / nexttrack を自動で呼ぶ
+        // そのたびに隣のチャンネルへ進むと、失敗が続くあいだ一覧を順に送ってしまう
+        // プレイリストのチャンネル移動は、画面のボタンとキーボードショートカットで行う
+        if (channels_store.playlist_channels.length > 0) {
+            navigator.mediaSession.setActionHandler('previoustrack', null);
+            navigator.mediaSession.setActionHandler('nexttrack', null);
+        } else {
+            // 前のトラックに移動
+            navigator.mediaSession.setActionHandler('previoustrack', async () => {
+                // ライブ視聴: 前のチャンネルに切り替え
+                if (this.playback_mode === 'Live') {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: channels_store.channel.previous.program_present?.title ?? '放送休止',
+                        artist: channels_store.channel.previous.name,
+                        artwork: artwork,
+                    });
+                    // ルーティングを前のチャンネルに置き換える
+                    await router.push({path: channels_store.watchPath(channels_store.channel.previous.display_channel_id)});
+                // ビデオ視聴: シリーズ番組の前の話数に切り替え
+                } else {
+                    // TODO: 未実装
+                }
+            });
+            // 次のトラックに移動
+            navigator.mediaSession.setActionHandler('nexttrack', async () => {  // 次のチャンネルに切り替え
+                // ライブ視聴: 次のチャンネルに切り替え
+                if (this.playback_mode === 'Live') {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: channels_store.channel.next.program_present?.title ?? '放送休止',
+                        artist: channels_store.channel.next.name,
+                        artwork: artwork,
+                    });
+                    // ルーティングを次のチャンネルに置き換える
+                    await router.push({path: channels_store.watchPath(channels_store.channel.next.display_channel_id)});
+                // ビデオ視聴: シリーズ番組の次の話数に切り替え
+                } else {
+                    // TODO: 未実装
+                }
+            });
+        }
         // Picture-in-Picture モードに切り替える (Chrome 120 以降のみ対応)
         // これによりブラウザのメディアコントロールから Document Picture-in-Picture を開始できるようになる
         // ref: https://developer.chrome.com/blog/automatic-picture-in-picture

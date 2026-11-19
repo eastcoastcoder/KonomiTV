@@ -3,8 +3,8 @@
         <router-link class="watch-header__back-icon" v-ripple :to="playback_mode === 'Live' ? '/tv/' : '/videos/'">
             <Icon icon="fluent:chevron-left-12-filled" width="21px" />
         </router-link>
-        <img class="watch-header__broadcaster" v-if="playback_mode === 'Live'"
-            :src="`${Utils.api_base_url}/channels/${channelsStore.channel.current.id}/logo`">
+        <img class="watch-header__broadcaster" v-if="playback_mode === 'Live' && broadcaster_logo_url !== ''"
+            :src="broadcaster_logo_url">
         <span class="watch-header__program-title" v-html="ProgramUtils.decorateProgramInfo(
             playback_mode === 'Live' ? channelsStore.channel.current.program_present : playerStore.recorded_program, 'title'
         )"></span>
@@ -62,6 +62,16 @@ export default defineComponent({
         // 録画再生時かつ設定がオンの場合に true
         is_showing_original_broadcast_time(): boolean {
             return this.playback_mode === 'Video' && this.settingsStore.settings.show_original_broadcast_time_during_playback === true;
+        },
+
+        // ヘッダーに出す局ロゴ
+        // プレイリストのチャンネルは tvg-logo を使い、無いときはロゴを出さない
+        broadcaster_logo_url(): string {
+            const channel = this.channelsStore.channel.current;
+            if (channel.stream_url !== undefined) {
+                return channel.logo_url ?? '';
+            }
+            return `${Utils.api_base_url}/channels/${channel.id}/logo`;
         },
     },
     methods: {

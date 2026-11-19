@@ -3,6 +3,7 @@ import { isEqual, hash } from 'ohash';
 import { defineStore } from 'pinia';
 import { toRaw } from 'vue';
 
+import type { UiLanguage } from '@/locales/messages';
 import type { IBlueskyReplyThreadState, ITwitterReplyThreadState } from '@/utils/TweetUtils';
 
 import Settings, { IClientSettings, IMutedCommentKeywords } from '@/services/Settings';
@@ -67,12 +68,16 @@ export interface ILocalClientSettings extends IClientSettings {
     lshaped_screen_crop_x_position: number;
     lshaped_screen_crop_y_position: number;
     lshaped_screen_crop_zoom_origin: 'TopLeft' | 'TopRight' | 'BottomLeft' | 'BottomRight';
+    // 画面の表示言語 (同期無効)
+    ui_language: UiLanguage;
     pinned_channel_ids: string[];
     timetable_channel_width: TimeTableSizeOption;
     timetable_hour_height: TimeTableSizeOption;
     timetable_hover_expand: boolean;
     timetable_dim_shopping_programs: boolean;
     timetable_genre_colors: ITimeTableGenreColors;
+    xmltv_epg_url: string;
+    m3u_playlist_url: string;
     show_player_background_image: boolean;
     use_pure_black_player_background: boolean;
     tv_channel_sort_by_jikkyo_force: boolean;
@@ -180,6 +185,13 @@ export const ILocalClientSettingsDefault: ILocalClientSettings = {
     // L字画面のクロップの拡大起点 (Default: 右下)
     lshaped_screen_crop_zoom_origin: 'BottomRight',
 
+    // ***** 表示言語 *****
+
+    // 画面の表示言語 (Default: 日本語) (同期無効)
+    // 番組表と全般設定の文言に使う
+    // このキーがまだ保存されていないときは、ブラウザの言語が英語なら English にする
+    ui_language: 'Japanese',
+
     // ***** ピン留め中チャンネルの並び替え設定 *****
 
     // ピン留めしているチャンネルの ID (ex: gr011) が入るリスト
@@ -211,6 +223,12 @@ export const ILocalClientSettingsDefault: ILocalClientSettings = {
         '福祉': 'White',
         'その他': 'White',
     },
+    // XMLTV 番組表を取得する URL (Default: 空)
+    // 空のときは XMLTV の番組表を読み込まない
+    xmltv_epg_url: '',
+    // M3U プレイリストを取得する URL (Default: 空)
+    // 空のときは M3U のチャンネル一覧を読み込まない
+    m3u_playlist_url: '',
 
     // ***** 設定 → 全般 *****
 
@@ -378,12 +396,15 @@ export const SYNCABLE_SETTINGS_KEYS: (keyof IClientSettings)[] = [
     // lshaped_screen_crop_x_position: 同期無効
     // lshaped_screen_crop_y_position: 同期無効
     // lshaped_screen_crop_zoom_origin: 同期無効
+    // ui_language: 同期無効
     'pinned_channel_ids',
     'timetable_channel_width',
     'timetable_hour_height',
     'timetable_hover_expand',
     'timetable_dim_shopping_programs',
     'timetable_genre_colors',
+    'xmltv_epg_url',
+    'm3u_playlist_url',
     'show_player_background_image',
     'use_pure_black_player_background',
     'tv_channel_sort_by_jikkyo_force',
@@ -492,6 +513,18 @@ export function getNormalizedLocalClientSettings(settings: {[key: string]: any})
     // ソートされていないと設定データの比較がうまくいかない
     const normalized_settings: Partial<ILocalClientSettings> = {};
     for (const default_settings_key of Object.keys(ILocalClientSettingsDefault)) {
+        // 表示言語は、未設定のブラウザが英語のときは English から始める
+        // 一度保存された値は、リセットするまで維持する
+        if (default_settings_key === 'ui_language') {
+            const value = settings.ui_language;
+            if (value === 'Japanese' || value === 'English') {
+                normalized_settings.ui_language = value;
+            } else {
+                const browser_language = typeof navigator === 'undefined' ? '' : navigator.language.toLowerCase();
+                normalized_settings.ui_language = browser_language.startsWith('en') ? 'English' : 'Japanese';
+            }
+            continue;
+        }
         if (default_settings_key in settings) {
             normalized_settings[default_settings_key] = settings[default_settings_key];
         } else {

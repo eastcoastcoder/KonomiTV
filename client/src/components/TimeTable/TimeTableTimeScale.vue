@@ -13,7 +13,7 @@
                     {{ getDateLabel(hourTime) }}
                 </span>
                 <span class="timetable-time-scale__hour-number">{{ formatHour(hourTime) }}</span>
-                <span class="timetable-time-scale__hour-label">時</span>
+                <span class="timetable-time-scale__hour-label" v-if="t('timetable.hourSuffix') !== ''">{{ t('timetable.hourSuffix') }}</span>
             </div>
         </div>
     </div>
@@ -24,6 +24,7 @@ import { computed } from 'vue';
 
 import type { Dayjs } from 'dayjs';
 
+import { useUiText } from '@/locales/useUiText';
 import useSettingsStore from '@/stores/SettingsStore';
 import useTimeTableStore from '@/stores/TimeTableStore';
 
@@ -36,6 +37,7 @@ const props = defineProps<{
 // ストア
 const settingsStore = useSettingsStore();
 const timetableStore = useTimeTableStore();
+const { t } = useUiText();
 
 /**
  * 表示する時刻の Dayjs オブジェクト配列

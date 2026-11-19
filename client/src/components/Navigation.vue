@@ -8,75 +8,75 @@
                             'navigation__link--active': $route.path.startsWith('/tv'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? 'テレビをみる' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.tv') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:tv-20-regular" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">テレビをみる</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.tv') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/videos/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/videos'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? 'ビデオをみる' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.videos') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:movies-and-tv-20-regular" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">ビデオをみる</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.videos') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/timetable/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/timetable'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? '番組表' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.timetable') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:calendar-ltr-20-regular" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">番組表</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.timetable') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/reservations/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/reservations'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? '録画予約' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.reservations') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:timer-16-regular" width="26px" style="padding: 0.5px;" />
-                        <span v-if="!iconOnly" class="navigation__link-text">録画予約</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.reservations') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/captures/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/captures'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? 'キャプチャ' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.captures') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:image-multiple-24-regular" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">キャプチャ</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.captures') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/offline-videos/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/offline-videos'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? 'オフライン保存' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.offline') : ''">
                         <span class="navigation__link-icon-wrapper">
                             <Icon class="navigation__link-icon" icon="fluent:cloud-arrow-down-16-regular" width="26px" />
                             <OfflineDownloadBadge variant="overlay" />
                         </span>
-                        <span v-if="!iconOnly" class="navigation__link-text">オフライン保存</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.offline') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/mylist/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/mylist'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? 'マイリスト' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.mylist') : ''">
                         <Icon class="navigation__link-icon" icon="ic:round-playlist-play" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">マイリスト</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.mylist') }}</span>
                     </router-link>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/watched-history/"
                         :class="{
                             'navigation__link--active': $route.path.startsWith('/watched-history'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? '視聴履歴' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.history') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:history-20-regular" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">視聴履歴</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.history') }}</span>
                     </router-link>
                     <v-spacer></v-spacer>
                     <router-link v-ripple class="navigation__link" active-class="navigation__link--active" to="/settings/"
@@ -84,9 +84,9 @@
                             'navigation__link--active': $route.path.startsWith('/settings'),
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ? '設定' : ''">
+                        v-ftooltip.right="iconOnly ? t('nav.settings') : ''">
                         <Icon class="navigation__link-icon" icon="fluent:settings-20-regular" width="26px" />
-                        <span v-if="!iconOnly" class="navigation__link-text">設定</span>
+                        <span v-if="!iconOnly" class="navigation__link-text">{{ t('nav.settings') }}</span>
                     </router-link>
                     <a v-ripple class="navigation__link" active-class="navigation__link--active"
                         href="https://github.com/tsukumijima/KonomiTV" target="_blank"
@@ -95,9 +95,7 @@
                             'navigation__link--highlight': versionStore.is_update_available,
                             'navigation__link--icon-only': iconOnly,
                         }"
-                        v-ftooltip.right="iconOnly ?
-                            (versionStore.is_update_available ? `アップデートがあります (version ${versionStore.latest_version})` : `version ${versionStore.client_version}`) :
-                            (versionStore.is_update_available ? `アップデートがあります (version ${versionStore.latest_version})` : '')">
+                        v-ftooltip.right="versionTooltip">
                         <Icon class="navigation__link-icon" icon="fluent:info-16-regular" width="26px" />
                         <span v-if="!iconOnly" class="navigation__link-text">version {{versionStore.client_version}}</span>
                     </a>
@@ -114,6 +112,8 @@ import { defineComponent } from 'vue';
 
 import BottomNavigation from '@/components/BottomNavigation.vue';
 import OfflineDownloadBadge from '@/components/OfflineDownloadBadge.vue';
+import { fillMessage, translate, type MessageKey } from '@/locales/messages';
+import useSettingsStore from '@/stores/SettingsStore';
 import useVersionStore from '@/stores/VersionStore';
 
 export default defineComponent({
@@ -132,10 +132,44 @@ export default defineComponent({
     },
     computed: {
         ...mapStores(useVersionStore),
+        ...mapStores(useSettingsStore),
+        versionTooltip(): string {
+            if (this.versionStore.is_update_available) {
+                return fillMessage(this.t('nav.updateAvailable'), {version: this.versionStore.latest_version ?? ''});
+            }
+            if (this.iconOnly) {
+                return `version ${this.versionStore.client_version}`;
+            }
+            return '';
+        },
+    },
+    methods: {
+        t(key: MessageKey): string {
+            return translate(this.settingsStore.settings.ui_language, key);
+        },
+
+        // この画面がサーバーのバージョン API を呼ばないとき true
+        // 受信環境がない状態で /tv/ や /timetable/ を開いても、バージョン取得のエラーを出さない
+        skipsServerVersion(): boolean {
+            const path = this.$route.path;
+            const settings = this.settingsStore.settings;
+            if (path.startsWith('/tv/playlist')) {
+                return true;
+            }
+            if ((path === '/tv' || path === '/tv/') && settings.m3u_playlist_url.trim() !== '') {
+                return true;
+            }
+            if (path.startsWith('/timetable') && settings.xmltv_epg_url.trim() !== '') {
+                return true;
+            }
+            return false;
+        },
     },
     async created() {
         // オフライン保存ページは通信なしでも開くため、明らかなオフライン状態でバージョン API のエラーを表示しない
         if (this.$route.path.startsWith('/offline-videos') && navigator.onLine === false) return;
+        // M3U のテレビホーム、XMLTV の番組表、プレイリスト再生はサーバー API を呼ばない
+        if (this.skipsServerVersion() === true) return;
         await this.versionStore.fetchServerVersion();
     }
 });

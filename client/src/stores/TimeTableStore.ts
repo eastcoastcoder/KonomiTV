@@ -5,8 +5,11 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import type { Dayjs } from 'dayjs';
 
+import { translate } from '@/locales/messages';
+import Message from '@/message';
 import { ChannelType, ChannelTypePretty } from '@/services/Channels';
 import Programs, { ITimeTableChannel } from '@/services/Programs';
+import XmltvEpg, { XMLTV_EPG_URL_NOT_SET_MESSAGE } from '@/services/XmltvEpg';
 import useChannelsStore from '@/stores/ChannelsStore';
 import useSettingsStore from '@/stores/SettingsStore';
 import { dayjs } from '@/utils';
@@ -58,6 +61,20 @@ const useTimeTableStore = defineStore('timetable', () => {
 
     // ローディング状態
     const is_loading = ref<boolean>(false);
+
+    // XMLTV を直接読み込む番組表かどうか
+    // true の間はサーバー API と ChannelsStore を使わない
+    const is_xmltv = ref<boolean>(false);
+
+    // XMLTV の取得に失敗したかどうか
+    const xmltv_load_failed = ref<boolean>(false);
+
+    // XMLTV に含まれるチャンネル種別
+    const xmltv_channel_types = ref<Set<ChannelTypePretty>>(new Set());
+
+    // 番組表の読み込みを無効にするための世代
+    // ページを離れたあとに XML の取得が終わっても、結果を今の画面へ書かない
+    let load_generation = 0;
 
     // 初回の番組表データ取得が完了したかどうか
     const is_initial_load_completed = ref<boolean>(false);
@@ -222,6 +239,11 @@ const useTimeTableStore = defineStore('timetable', () => {
     const available_channel_types = computed<Set<ChannelTypePretty>>(() => {
         const types = new Set<ChannelTypePretty>();
 
+        // XMLTV の番組表は、取得したチャンネルの種別だけを選択肢にする
+        if (is_xmltv.value === true) {
+            return xmltv_channel_types.value;
+        }
+
         // ChannelsStore の初期化が完了していない場合は空のセットを返す
         if (channels_store.is_channels_list_initial_updated === false) {
             return types;
@@ -327,6 +349,27 @@ const useTimeTableStore = defineStore('timetable', () => {
         // ChannelTypePretty から API 用の ChannelType に変換
         const api_channel_type = CHANNEL_TYPE_PRETTY_TO_API.get(actual_channel_type);
 
+        // XMLTV の番組表は取得済みのデータから表示範囲を切り出す
+        if (is_xmltv.value === true) {
+            const generation = load_generation;
+            if (api_channel_type === undefined) {
+                channels_data.value = [];
+                return true;
+            }
+            const guide = await XmltvEpg.loadGuide();
+            // 取得中にページを離れていたら、通常の番組表の結果を上書きしない
+            if (generation !== load_generation) {
+                return false;
+            }
+            const response = XmltvEpg.slice(guide, actual_start_time, actual_end_time, api_channel_type);
+            channels_data.value = response.channels;
+            date_range.value = {
+                earliest: dayjs(response.date_range.earliest),
+                latest: dayjs(response.date_range.latest),
+            };
+            return true;
+        }
+
         // API リクエストを実行 (Programs サービスを使用)
         const response = await Programs.fetchTimeTable(
             actual_start_time,
@@ -360,6 +403,7 @@ const useTimeTableStore = defineStore('timetable', () => {
      * ChannelsStore の初期化完了を待ってから、1日分の全データを取得する
      */
     async function initialLoad(): Promise<void> {
+        is_xmltv.value = false;
         is_loading.value = true;
         is_initial_load_completed.value = false;
 
@@ -388,6 +432,66 @@ const useTimeTableStore = defineStore('timetable', () => {
 
         } finally {
             is_loading.value = false;
+        }
+    }
+
+
+    /**
+     * XMLTV の番組表を取得して初期表示する
+     * サーバーのチャンネル一覧と番組表 API は呼ばない
+     */
+    async function initialLoadXmltv(): Promise<void> {
+        const generation = load_generation;
+        is_xmltv.value = true;
+        xmltv_load_failed.value = false;
+        is_loading.value = true;
+        is_initial_load_completed.value = false;
+
+        try {
+            const guide = await XmltvEpg.loadGuide();
+            // ページを離れたあとに結果が戻ったときは、通常の番組表へ書き戻さない
+            if (generation !== load_generation) {
+                return;
+            }
+            xmltv_channel_types.value = new Set(guide.channel_types);
+
+            // 今日が番組の範囲外のときは、範囲の端の放送日を開く
+            selected_date.value = getTodayStartTime();
+            const earliest_date = getBroadcastDate(dayjs(guide.earliest));
+            const latest_date = getBroadcastDate(dayjs(guide.latest));
+            if (selected_date.value.isBefore(earliest_date, 'day')) {
+                selected_date.value = earliest_date;
+            }
+            if (selected_date.value.isAfter(latest_date, 'day')) {
+                selected_date.value = latest_date;
+            }
+            selected_channel_type.value = getDefaultChannelType();
+
+            const success = await fetchTimeTableData();
+            if (generation !== load_generation) {
+                return;
+            }
+            if (success === false) {
+                xmltv_load_failed.value = true;
+                return;
+            }
+            is_initial_load_completed.value = true;
+        } catch (error) {
+            if (generation !== load_generation) {
+                return;
+            }
+            xmltv_load_failed.value = true;
+            console.error('Failed to load XMLTV EPG:', error);
+            const language = settings_store.settings.ui_language;
+            if (error instanceof Error && error.message === XMLTV_EPG_URL_NOT_SET_MESSAGE) {
+                Message.error(translate(language, 'timetable.xmltvUrlMissingSnackbar'));
+            } else {
+                Message.error(translate(language, 'timetable.loadFailedSnackbar'));
+            }
+        } finally {
+            if (generation === load_generation) {
+                is_loading.value = false;
+            }
         }
     }
 
@@ -624,9 +728,13 @@ const useTimeTableStore = defineStore('timetable', () => {
      * 番組表ページから離れる際に呼び出される
      */
     function reset(): void {
+        load_generation += 1;
         channels_data.value = [];
         date_range.value = null;
         is_loading.value = false;
+        is_xmltv.value = false;
+        xmltv_load_failed.value = false;
+        xmltv_channel_types.value = new Set();
         is_initial_load_completed.value = false;
         is_36hour_display.value = false;
         date_display_offset.value = 0;
@@ -641,6 +749,10 @@ const useTimeTableStore = defineStore('timetable', () => {
     watch(
         () => settings_store.settings.pinned_channel_ids,
         async (new_ids, old_ids) => {
+            // XMLTV の番組表にピン留めはない
+            if (is_xmltv.value === true) {
+                return;
+            }
             // ピン留め表示中でない場合は何もしない
             if (selected_channel_type.value !== 'ピン留め') {
                 return;
@@ -663,6 +775,10 @@ const useTimeTableStore = defineStore('timetable', () => {
     watch(
         () => channels_store.channels_list_with_pinned,
         async () => {
+            // XMLTV の番組表は ChannelsStore の更新で種別を切り替えない
+            if (is_xmltv.value === true) {
+                return;
+            }
             // 初期ロード完了前は何もしない
             if (is_initial_load_completed.value === false) {
                 return;
@@ -684,6 +800,8 @@ const useTimeTableStore = defineStore('timetable', () => {
         channels_data,
         date_range,
         is_loading,
+        is_xmltv,
+        xmltv_load_failed,
         is_initial_load_completed,
         is_36hour_display,
         date_display_offset,
@@ -703,6 +821,7 @@ const useTimeTableStore = defineStore('timetable', () => {
         setDateDisplayOffset,
         fetchTimeTableData,
         initialLoad,
+        initialLoadXmltv,
         changeDate,
         changeChannelType,
         goToPreviousDay,

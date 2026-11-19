@@ -1,7 +1,7 @@
 <template>
     <div class="program-container">
         <section class="program-broadcaster">
-            <img class="program-broadcaster__icon" :src="`${Utils.api_base_url}/channels/${channelsStore.channel.current.id}/logo`">
+            <img class="program-broadcaster__icon" v-if="broadcasterLogoUrl !== ''" :src="broadcasterLogoUrl">
             <div class="program-broadcaster__number">Ch: {{channelsStore.channel.current.channel_number}}</div>
             <div class="program-broadcaster__name">{{channelsStore.channel.current.name}}</div>
         </section>
@@ -167,6 +167,15 @@ export default defineComponent({
     },
     computed: {
         ...mapStores(useChannelsStore, useServerSettingsStore),
+
+        // プレイリストのチャンネルは tvg-logo を使い、無いときはロゴを出さない
+        broadcasterLogoUrl(): string {
+            const channel = this.channelsStore.channel.current;
+            if (channel.stream_url !== undefined) {
+                return channel.logo_url ?? '';
+            }
+            return `${Utils.api_base_url}/channels/${channel.id}/logo`;
+        },
 
         // EDCB バックエンドかどうか
         // サーバー設定がまだ取得されていない場合は EDCB と判定しない

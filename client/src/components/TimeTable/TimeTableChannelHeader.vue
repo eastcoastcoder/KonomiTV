@@ -1,5 +1,7 @@
 <template>
-    <router-link class="timetable-channel-header" :to="`/tv/watch/${channel.display_channel_id}`"
+    <component :is="plain ? 'div' : 'router-link'" class="timetable-channel-header"
+        :class="{'timetable-channel-header--plain': plain}"
+        :to="plain ? undefined : `/tv/watch/${channel.display_channel_id}`"
         v-ftooltip.bottom="tooltipText"
         :style="{
             width: `${width}px`,
@@ -9,8 +11,8 @@
             '--timetable-channel-number-size': `${numberFontSize}px`,
             '--timetable-channel-name-size': `${nameFontSize}px`,
         }">
-        <!-- チャンネルロゴ -->
-        <div class="timetable-channel-header__logo-wrapper">
+        <!-- チャンネルロゴ (XMLTV の番組表はサーバーのロゴを取りに行かない) -->
+        <div class="timetable-channel-header__logo-wrapper" v-if="!plain">
             <img class="timetable-channel-header__logo" loading="lazy" decoding="async"
                 :src="`${Utils.api_base_url}/channels/${channel.id}/logo`"
                 :alt="channel.name">
@@ -20,12 +22,14 @@
             <span class="timetable-channel-header__number">{{ channel.channel_number }}</span>
             <span class="timetable-channel-header__name">{{ channel.name }}</span>
         </div>
-    </router-link>
+    </component>
 </template>
 <script lang="ts" setup>
 
 import { computed } from 'vue';
 
+import { fillMessage } from '@/locales/messages';
+import { useUiText } from '@/locales/useUiText';
 import { ITimeTableChannel } from '@/services/Programs';
 import Utils from '@/utils';
 
@@ -36,6 +40,8 @@ const props = defineProps<{
     height: number;
     // ウィンドウリサイズ時に再計算をトリガーするためのカウンター (親から受け取る)
     resizeTrigger: number;
+    // 視聴画面へ遷移せず、サーバーのロゴも表示しない
+    plain?: boolean;
 }>();
 
 const logoWidth = computed(() => {
@@ -56,8 +62,13 @@ const nameFontSize = computed(() => {
     return Math.min(13.5, Math.max(Utils.isSmartphoneVertical() ? 10 : 12, props.width * 0.08));
 });
 
+const { t } = useUiText();
+
 const tooltipText = computed(() => {
-    return `${props.channel.name} を視聴`;
+    if (props.plain === true) {
+        return props.channel.name;
+    }
+    return fillMessage(t('timetable.watchChannel'), {name: props.channel.name});
 });
 
 </script>
@@ -81,6 +92,15 @@ const tooltipText = computed(() => {
 
     &:hover {
         background: rgb(var(--v-theme-background-lighten-2));
+    }
+
+    // XMLTV の番組表では視聴画面へ遷移しない
+    &--plain {
+        cursor: default;
+
+        &:hover {
+            background: rgb(var(--v-theme-background-lighten-1));
+        }
     }
 
     // タッチデバイスでは hover を無効化

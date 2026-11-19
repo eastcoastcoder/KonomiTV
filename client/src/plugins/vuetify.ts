@@ -2,7 +2,7 @@
 import 'vuetify/styles';
 import '@/styles/materialdesignicons.min.css';
 import { createVuetify } from 'vuetify';
-import { ja } from 'vuetify/locale';
+import { en, ja } from 'vuetify/locale';
 
 
 // ref: https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
@@ -10,7 +10,7 @@ const vuetify = createVuetify({
     locale: {
         locale: 'ja',
         fallback: 'ja',
-        messages: { ja },
+        messages: { ja, en },
     },
     theme: {
         defaultTheme: 'dark',

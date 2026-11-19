@@ -35,6 +35,17 @@ const router = createRouter({
             component: () => import('@/views/TV/Search.vue'),
         },
         {
+            // プレイリストの再生画面。チャンネル一覧は /tv/ のテレビホームに統合している
+            // 再生 UI は通常のテレビ視聴と同じ Watch を使う
+            path: '/tv/playlist/watch/:channel_id',
+            name: 'TV Playlist Watch',
+            component: () => import('@/views/TV/Watch.vue'),
+        },
+        {
+            path: '/tv/playlist',
+            redirect: '/tv/',
+        },
+        {
             path: '/videos/',
             name: 'Videos Home',
             component: () => import('@/views/Videos/Home.vue'),
@@ -58,6 +69,11 @@ const router = createRouter({
             path: '/timetable/',
             name: 'TimeTable',
             component: () => import('@/views/TimeTable.vue'),
+        },
+        {
+            // 以前の XMLTV 専用ルート。番組表は /timetable/ に統合している
+            path: '/timetable/xmltv',
+            redirect: '/timetable/',
         },
         {
             path: '/reservations/',

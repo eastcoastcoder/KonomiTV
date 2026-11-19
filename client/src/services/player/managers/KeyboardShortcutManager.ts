@@ -127,7 +127,7 @@ class KeyboardShortcutManager implements PlayerManager {
                 const switch_channel = settings_store.settings.tv_channel_up_down_buttons_reverse
                     ? channels_store.channel.next
                     : channels_store.channel.previous;
-                router.push({path: `/tv/watch/${switch_channel.display_channel_id}`});
+                router.push({path: channels_store.watchPath(switch_channel.display_channel_id)});
             }},
 
             // ↓: ライブ視聴: チャンネル切り替え設定に応じて次/前のチャンネルに切り替える
@@ -136,7 +136,7 @@ class KeyboardShortcutManager implements PlayerManager {
                 const switch_channel = settings_store.settings.tv_channel_up_down_buttons_reverse
                     ? channels_store.channel.previous
                     : channels_store.channel.next;
-                router.push({path: `/tv/watch/${switch_channel.display_channel_id}`});
+                router.push({path: channels_store.watchPath(switch_channel.display_channel_id)});
             }},
 
             // /(？): キーボードショートカットの一覧を表示する
@@ -504,7 +504,7 @@ class KeyboardShortcutManager implements PlayerManager {
                     // チャンネルが取得できていれば、ルーティングをそのチャンネルに置き換える
                     // 押されたキーに対応するリモコン ID のチャンネルがない場合や、現在と同じチャンネル ID の場合は何も起こらない
                     if (switch_channel !== null && switch_channel.display_channel_id !== channels_store.display_channel_id) {
-                        router.push({path: `/tv/watch/${switch_channel.display_channel_id}`});
+                        router.push({path: channels_store.watchPath(switch_channel.display_channel_id)});
 
                         // 既定のキーボードショートカットイベントをキャンセルして終了
                         event.preventDefault();

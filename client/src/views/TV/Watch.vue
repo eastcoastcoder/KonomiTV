@@ -7,6 +7,7 @@ import { mapStores } from 'pinia';
 import { defineComponent } from 'vue';
 
 import Watch from '@/components/Watch/Watch.vue';
+import M3uPlaylist from '@/services/M3uPlaylist';
 import PlayerController from '@/services/player/PlayerController';
 import useChannelsStore from '@/stores/ChannelsStore';
 import usePlayerStore from '@/stores/PlayerStore';
@@ -39,7 +40,10 @@ export default defineComponent({
         // 下記以外の視聴画面の開始処理は Watch コンポーネントの方で自動的に行われる
 
         // チャンネル ID をセット
-        this.channelsStore.display_channel_id = this.$route.params.display_channel_id as string;
+        // プレイリスト視聴は、プレイリストを読み込んでから init() の中でセットする
+        if (this.$route.name !== 'TV Playlist Watch') {
+            this.channelsStore.display_channel_id = this.$route.params.display_channel_id as string;
+        }
 
         // 再生セッションを初期化
         this.init();
@@ -55,7 +59,13 @@ export default defineComponent({
         const destroy_promise = this.destroy();
 
         // チャンネル ID を次のチャンネルのものに切り替える
-        this.channelsStore.display_channel_id = to.params.display_channel_id as string;
+        // プレイリスト視聴を離れて通常のテレビ視聴へ進むときは、プレイリスト用の一覧を捨てる
+        if (to.name === 'TV Playlist Watch') {
+            this.channelsStore.display_channel_id = this.playlistChannelId(to.params.channel_id);
+        } else {
+            this.channelsStore.clearPlaylistChannels();
+            this.channelsStore.display_channel_id = to.params.display_channel_id as string;
+        }
 
         (async () => {
 
@@ -86,6 +96,7 @@ export default defineComponent({
         this.destroy();
 
         // このページから離れるので、チャンネル ID を gr000 (ダミー値) に戻す
+        this.channelsStore.clearPlaylistChannels();
         this.channelsStore.display_channel_id = 'gr000';
 
         // 上記以外の視聴画面の終了処理は Watch コンポーネントの方で自動的に行われる
@@ -94,6 +105,12 @@ export default defineComponent({
 
         // 再生セッションを初期化する
         async init() {
+
+            // プレイリストのチャンネルは、サーバーのライブストリームではなく M3U の HLS を再生する
+            if (this.$route.name === 'TV Playlist Watch') {
+                await this.initPlaylist();
+                return;
+            }
 
             // 00秒までの残り秒数を取得
             // 現在 16:01:34 なら 26 (秒) になる
@@ -134,6 +151,57 @@ export default defineComponent({
             // PlayerController を初期化
             player_controller = new PlayerController('Live');
             await player_controller.init();
+        },
+
+        // プレイリストの再生セッションを初期化する
+        async initPlaylist() {
+
+            // URL が空のときと、取得に失敗したときは、案内のあるテレビホームへ戻す
+            if (this.settingsStore.settings.m3u_playlist_url.trim() === '') {
+                this.$router.push({path: '/tv/'});
+                return;
+            }
+            let channels;
+            try {
+                const playlist = await M3uPlaylist.load();
+                channels = playlist.channels;
+            } catch (error) {
+                console.error('Failed to load M3U playlist:', error);
+                if (this.$route.name === 'TV Playlist Watch') {
+                    this.$router.push({path: '/tv/'});
+                }
+                return;
+            }
+            // 取得を待っているあいだに視聴画面を離れていたときは、プレイヤーを作らない
+            if (this.$route.name !== 'TV Playlist Watch') {
+                return;
+            }
+            this.channelsStore.setPlaylistChannels(channels);
+
+            // URL のチャンネルがプレイリストに無いときは、一覧へ戻す
+            const channel_id = this.playlistChannelId(this.$route.params.channel_id);
+            const channel_exists = channels.some((channel) => channel.id === channel_id);
+            if (channel_id === '' || channel_exists === false) {
+                this.$router.push({path: '/tv/'});
+                return;
+            }
+            this.channelsStore.display_channel_id = channel_id;
+
+            // PlayerController を初期化
+            // チャンネルに stream_url があるので、ライブストリーム API ではなくその HLS を再生する
+            player_controller = new PlayerController('Live');
+            await player_controller.init();
+        },
+
+        // ルートパラメータからプレイリストのチャンネル ID を取り出す
+        playlistChannelId(channel_id: unknown): string {
+            if (typeof channel_id === 'string') {
+                return channel_id;
+            }
+            if (Array.isArray(channel_id) && typeof channel_id[0] === 'string') {
+                return channel_id[0];
+            }
+            return '';
         },
 
         // 再生セッションを破棄する

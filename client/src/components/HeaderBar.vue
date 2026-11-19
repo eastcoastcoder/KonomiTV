@@ -14,7 +14,7 @@
         <v-btn v-show="isButtonDisplay && !isTimeTablePage" variant="flat" class="pwa-install-button"
             @click="pwaInstallHandler.install()">
             <Icon icon="material-symbols:install-desktop-rounded" height="20px" class="mr-1" />
-            アプリとしてインストール
+            {{ t('header.install') }}
         </v-btn>
         <div class="mr-3 mr-md-6"></div>
     </header>
@@ -25,6 +25,8 @@ import { pwaInstallHandler } from 'pwa-install-handler';
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 
+import { useUiText } from '@/locales/useUiText';
+import useSettingsStore from '@/stores/SettingsStore';
 import Utils from '@/utils';
 
 const props = defineProps<{
@@ -40,6 +42,8 @@ const isButtonDisplay = ref(false);
 const internalSearchQuery = ref('');
 const router = useRouter();
 const route = useRoute();
+const settingsStore = useSettingsStore();
+const { t } = useUiText();
 
 const searchQuery = computed({
     get: () => props.searchQuery ?? internalSearchQuery.value,
@@ -86,11 +90,11 @@ const isVideoSection = (path: string) => {
 
 const searchPlaceholder = computed(() => {
     if (route.path.startsWith('/captures')) {
-        return 'キャプチャを検索...';
+        return t('search.captures');
     }
     return isVideoSection(route.path)
-        ? '録画番組を検索...'
-        : '放送予定の番組を検索...';
+        ? t('search.videos')
+        : t('search.programs');
 });
 
 const getSearchPath = () => {
@@ -125,7 +129,13 @@ const doSearch = () => {
 
 const showSearchInput = computed(() => {
     const path = route.path;
-    return !path.startsWith('/settings') && !path.startsWith('/login') && !path.startsWith('/register');
+    // プレイリストをテレビホームにしているときは、ヘッダー検索がサーバーの番組検索へ飛ばないようにする
+    // チャンネルの絞り込みはプレイリスト側の検索欄を使う
+    if ((path === '/tv' || path === '/tv/') && settingsStore.settings.m3u_playlist_url.trim() !== '') {
+        return false;
+    }
+    return !path.startsWith('/settings') && !path.startsWith('/login') && !path.startsWith('/register') &&
+        !path.startsWith('/tv/playlist');
 });
 
 // 番組表ページかどうか（ヘッダーにコントロールが多くスペースに余裕がないため、PWA インストールボタンを非表示にする）

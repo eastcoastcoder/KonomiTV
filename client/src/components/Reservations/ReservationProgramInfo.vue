@@ -5,7 +5,7 @@
                 v-html="ProgramUtils.decorateProgramInfo(displayProgram, 'title')">
             </h1>
             <div class="program-info__broadcaster">
-                <img class="program-info__broadcaster-icon"
+                <img class="program-info__broadcaster-icon" v-if="!displayChannel.id.startsWith('xmltv:')"
                     :src="`${Utils.api_base_url}/channels/${displayChannel.id}/logo`"
                     @error="onLogoError">
                 <div class="program-info__broadcaster-container">
@@ -33,7 +33,7 @@
                     <Icon icon="fluent:video-16-filled" height="17px" style="margin-left: -2px; margin-right: -1.7px; margin-bottom: -3px;" />
                     <span class="ml-2">映像: {{displayProgram.video_codec}} / {{displayProgram.video_resolution}}</span>
                 </div>
-                <div class="program-info__status">
+                <div class="program-info__status" v-if="displayProgram.primary_audio_type">
                     <Icon icon="fluent:headphones-sound-wave-20-filled" height="17px" style="margin-left: -2px; margin-right: -1.7px; margin-bottom: -3px;" />
                     <span class="ml-2">主音声: {{displayProgram.primary_audio_type}} {{displayProgram.primary_audio_sampling_rate || 'Unknown'}} / {{displayProgram.primary_audio_language}}</span>
                 </div>

@@ -1,7 +1,9 @@
 
 import { defineStore } from 'pinia';
 
+import { translate } from '@/locales/messages';
 import Channels, { ChannelType, ChannelTypePretty, ILiveChannelsList, ILiveChannel, ILiveChannelDefault } from '@/services/Channels';
+import { type IM3uChannel } from '@/services/M3uPlaylist';
 import { IProgram, IProgramDefault } from '@/services/Programs';
 import useSettingsStore from '@/stores/SettingsStore';
 import Utils, { ChannelUtils } from '@/utils';
@@ -51,6 +53,11 @@ const useChannelsStore = defineStore('channels', {
         // チャンネル切り替え後、LiveDataBroadcastingManager で EIT[p/f] から取得されるまでは null になる
         // 視聴画面のみ有効で、ホーム画面では利用されない
         current_program_following: null as IProgram | null,
+
+        // M3U プレイリストの視聴中だけ入るチャンネル一覧
+        // 入っているあいだは、channel と視聴画面のチャンネル一覧がこの一覧を使う
+        // 視聴画面を離れるときに空に戻す
+        playlist_channels: [] as ILiveChannel[],
     }),
     getters: {
 
@@ -59,6 +66,44 @@ const useChannelsStore = defineStore('channels', {
          * チャンネル情報はデータ量がかなり多いので、個別に取得するより一気に取得したほうがループ回数が少なくなりパフォーマンスが良い
          */
         channel(): { previous: ILiveChannel; current: ILiveChannel; next: ILiveChannel; } {
+
+            // M3U プレイリストの視聴中は、サーバーのチャンネル一覧ではなくプレイリストの並びを使う
+            if (this.playlist_channels.length > 0) {
+                const current_channel_index = this.playlist_channels.findIndex((channel) => {
+                    return channel.display_channel_id === this.display_channel_id;
+                });
+                if (current_channel_index === -1) {
+                    const IProgramError: IProgram = {
+                        ...IProgramDefault,
+                        title: 'チャンネル情報取得エラー',
+                        description: 'このチャンネル ID のチャンネル情報は存在しません。',
+                    };
+                    const ILiveChannelError: ILiveChannel = {
+                        ...ILiveChannelDefault,
+                        name: 'チャンネル情報取得エラー',
+                        program_present: IProgramError,
+                        program_following: IProgramError,
+                    };
+                    return {
+                        previous: ILiveChannelError,
+                        current: ILiveChannelError,
+                        next: ILiveChannelError,
+                    };
+                }
+                let previous_channel_index = current_channel_index - 1;
+                if (previous_channel_index < 0) {
+                    previous_channel_index = this.playlist_channels.length - 1;
+                }
+                let next_channel_index = current_channel_index + 1;
+                if (next_channel_index >= this.playlist_channels.length) {
+                    next_channel_index = 0;
+                }
+                return {
+                    previous: this.playlist_channels[previous_channel_index],
+                    current: structuredClone(this.playlist_channels[current_channel_index]),
+                    next: this.playlist_channels[next_channel_index],
+                };
+            }
 
             // 初回のチャンネル情報更新がまだ実行されていない or 実行中のときは、情報取得中であることを示すダミーのチャンネル情報を返す
             if (this.is_channels_list_initial_updated === false) {
@@ -325,10 +370,29 @@ const useChannelsStore = defineStore('channels', {
          * 視聴画面向けの channels_list_with_pinned
          * 視聴画面ではピン留め中チャンネルが1つもないときは、ピン留めタブを表示する必要性がないため削除される
          */
-        channels_list_with_pinned_for_watch(): Map<ChannelTypePretty, ILiveChannel[]> {
+        channels_list_with_pinned_for_watch(): Map<string, ILiveChannel[]> {
+
+            // M3U プレイリストの視聴中は、group-title ごとのタブでチャンネルを並べる
+            if (this.playlist_channels.length > 0) {
+                const settings_store = useSettingsStore();
+                const other_group = translate(settings_store.settings.ui_language, 'playlist.otherGroup');
+                const grouped = new Map<string, ILiveChannel[]>();
+                for (const channel of this.playlist_channels) {
+                    const group_name = channel.playlist_group !== undefined && channel.playlist_group !== ''
+                        ? channel.playlist_group
+                        : other_group;
+                    let channels = grouped.get(group_name);
+                    if (channels === undefined) {
+                        channels = [];
+                        grouped.set(group_name, channels);
+                    }
+                    channels.push(channel);
+                }
+                return grouped;
+            }
 
             // 意図せぬ副作用が発生しないように、channels_list_with_pinned が返す Map をコピーする
-            const channels_list_with_pinned = new Map([...this.channels_list_with_pinned]);
+            const channels_list_with_pinned = new Map<string, ILiveChannel[]>([...this.channels_list_with_pinned]);
 
             // 初回のチャンネル情報更新がまだ実行されていない or 実行中のときのみ、表示タイミングの問題で例外的に常にピン留めタブを削除せずに返す
             // こうしないと視聴画面に直接アクセスした際に、ピン留めタブではなく地デジタブがデフォルトで表示されてしまう
@@ -354,6 +418,12 @@ const useChannelsStore = defineStore('channels', {
          */
         getChannelByRemoconID(channel_type: ChannelType, remocon_id: number): ILiveChannel | null {
 
+            // M3U プレイリストの視聴中は、並び順の番号をリモコン番号として使う
+            if (this.playlist_channels.length > 0) {
+                const channel = this.playlist_channels.find((item) => item.remocon_id === remocon_id);
+                return channel ?? null;
+            }
+
             // 指定されたチャンネルタイプのチャンネルを取得
             const channels = this.channels_list[channel_type];
 
@@ -363,6 +433,72 @@ const useChannelsStore = defineStore('channels', {
             // リモコン番号が一致するチャンネルを見つけられなかった場合は null を返す
             return channel ?? null;
         },
+
+        /**
+         * 視聴画面の遷移先を返す
+         * プレイリスト視聴中はプレイリストの再生画面へ、それ以外は通常のテレビ視聴画面へ進む
+         * @param display_channel_id 遷移先のチャンネル ID
+         * @returns 視聴画面のパス
+         */
+        watchPath(display_channel_id: string): string {
+            if (this.playlist_channels.length > 0) {
+                return `/tv/playlist/watch/${encodeURIComponent(display_channel_id)}`;
+            }
+            return `/tv/watch/${display_channel_id}`;
+        },
+
+
+        /**
+         * M3U プレイリストを視聴画面用のチャンネル一覧に置き換える
+         * @param channels パース済みのプレイリストのチャンネル
+         */
+        setPlaylistChannels(channels: IM3uChannel[]): void {
+            const playlist_channels: ILiveChannel[] = [];
+            for (const [index, channel] of channels.entries()) {
+                const program_present: IProgram = {
+                    ...IProgramDefault,
+                    id: `m3u-${channel.id}`,
+                    channel_id: `m3u-${channel.id}`,
+                    title: channel.name,
+                    description: channel.group,
+                };
+                const program_following: IProgram = {
+                    ...IProgramDefault,
+                    id: `m3u-${channel.id}-next`,
+                    channel_id: `m3u-${channel.id}`,
+                    title: '',
+                    description: '',
+                };
+                playlist_channels.push({
+                    ...ILiveChannelDefault,
+                    id: `m3u:${channel.id}`,
+                    display_channel_id: channel.id,
+                    remocon_id: index + 1,
+                    channel_number: String(index + 1),
+                    name: channel.name,
+                    is_display: true,
+                    is_watchable: true,
+                    stream_url: channel.stream_url,
+                    logo_url: channel.logo_url,
+                    playlist_group: channel.group,
+                    program_present,
+                    program_following,
+                });
+            }
+            // サーバーのチャンネル一覧と同じく凍結する
+            // リアクティブなプロキシのまま channel ゲッターが structuredClone() すると DataCloneError になる
+            this.playlist_channels = Utils.deepObjectFreeze(playlist_channels);
+        },
+
+
+        /**
+         * プレイリスト視聴用のチャンネル一覧を捨てる
+         * 視聴画面を離れたときに、通常のテレビ視聴へ戻す
+         */
+        clearPlaylistChannels(): void {
+            this.playlist_channels = [];
+        },
+
 
         /**
          * チャンネルリストを更新する

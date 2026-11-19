@@ -40,13 +40,13 @@
                     <!-- 現在時刻に戻るボタン -->
                     <v-btn variant="flat" class="timetable-controls__now-button" icon
                         @click="goToCurrentTime"
-                        v-ftooltip.bottom="'現在時刻に移動'">
+                        v-ftooltip.bottom="t('timetable.moveToNow')">
                         <Icon icon="fluent:clock-20-regular" width="22px" />
                     </v-btn>
                     <!-- 設定ボタン -->
                     <v-btn variant="flat" class="timetable-controls__settings-button" icon
                         @click="isSettingsDialogOpen = true"
-                        v-ftooltip.bottom="'番組表の表示設定'">
+                        v-ftooltip.bottom="t('timetable.displaySettings')">
                         <Icon icon="fluent:settings-20-regular" width="22px" />
                     </v-btn>
                 </div>
@@ -91,12 +91,28 @@
                     </div>
                 </div>
                 <!-- 番組表グリッド -->
+                <div class="timetable-xmltv-status" v-if="isXmltv && timetableStore.xmltv_load_failed">
+                    <p v-if="isXmltvUrlMissing">{{ t('timetable.xmltvUrlMissing') }}</p>
+                    <p v-else>{{ t('timetable.loadFailed') }}</p>
+                    <v-btn v-if="isXmltvUrlMissing" class="px-3" color="secondary" variant="flat" height="40" to="/settings/general">
+                        <Icon icon="fluent:settings-20-regular" width="18px" height="18px" />
+                        <span class="ml-1">{{ t('timetable.openSettings') }}</span>
+                    </v-btn>
+                    <v-btn v-else class="px-3" color="secondary" variant="flat" height="40" @click="loadTimeTableForRoute">
+                        <Icon icon="fluent:arrow-clockwise-20-regular" width="18px" height="18px" />
+                        <span class="ml-1">{{ t('timetable.reload') }}</span>
+                    </v-btn>
+                </div>
+                <div class="timetable-xmltv-status" v-else-if="isXmltv && timetableStore.is_loading && timetableStore.channels_data.length === 0">
+                    <p>{{ t('timetable.loading') }}</p>
+                </div>
                 <TimeTableGrid
                     ref="timetableGridRef"
                     :channels="timetableStore.channels_data"
                     :is36HourDisplay="timetableStore.is_36hour_display"
                     :canGoPreviousDay="canGoPreviousDay"
                     :canGoNextDay="canGoNextDay"
+                    :viewOnly="isXmltv"
                     @time-slot-change="onTimeSlotChange"
                     @date-display-offset-change="onDateDisplayOffsetChange"
                     @show-program-detail="onShowProgramDetail"
@@ -115,6 +131,7 @@
             :program="drawerProgram"
             :channel="drawerChannel"
             :isPastProgram="isDrawerProgramPast"
+            :viewOnly="isXmltv"
             @added="onReservationAdded"
             @updated="onReservationUpdated"
             @deleted="onReservationDeleted"
@@ -133,17 +150,27 @@ import ReservationDetailDrawer from '@/components/Reservations/ReservationDetail
 import TimeTableSettingsDialog from '@/components/Settings/TimeTableSettings.vue';
 import SPHeaderBar from '@/components/SPHeaderBar.vue';
 import TimeTableGrid from '@/components/TimeTable/TimeTableGrid.vue';
+import { channelTypeLabel, formatTimeSlotLabel, weekdayLabel } from '@/locales/messages';
+import { useUiText } from '@/locales/useUiText';
 import Message from '@/message';
 import { IChannel, ChannelTypePretty } from '@/services/Channels';
 import { IProgram, ITimeTableProgram } from '@/services/Programs';
 import Reservations, { IReservation, IRecordSettings, IRecordSettingsDefault } from '@/services/Reservations';
 import useServerSettingsStore from '@/stores/ServerSettingsStore';
+import useSettingsStore from '@/stores/SettingsStore';
 import useTimeTableStore, { CHANNEL_TYPE_DISPLAY_ORDER } from '@/stores/TimeTableStore';
 import Utils, { dayjs, dayjsOriginal } from '@/utils';
 
 
 // ストア
 const timetableStore = useTimeTableStore();
+const settingsStore = useSettingsStore();
+
+// XMLTV の URL があるときは、サイドバーの /timetable/ でその番組表を出す
+// サーバーのチャンネル一覧と番組表 API は呼ばない
+const isXmltv = computed(() => settingsStore.settings.xmltv_epg_url.trim() !== '');
+const { language, t } = useUiText();
+const isXmltvUrlMissing = computed(() => settingsStore.settings.xmltv_epg_url.trim() === '');
 
 // コンポーネント参照
 const timetableGridRef = ref<InstanceType<typeof TimeTableGrid> | null>(null);
@@ -247,13 +274,13 @@ const isDrawerProgramPast = ref(false);
 // ChannelsStore の channels_list_with_pinned に基づいて、実際に存在するチャンネルタイプのみを表示する
 // ChannelTypePretty は表示名そのもの ('ピン留め', '地デジ', 'BS' など) なので、title と value は同じ値を使用する
 const channelTypeItems = computed(() => {
-    const items: { title: ChannelTypePretty; value: ChannelTypePretty }[] = [];
+    const items: { title: string; value: ChannelTypePretty }[] = [];
     const availableTypes = timetableStore.available_channel_types;
 
     // 表示順序に従って、利用可能なチャンネルタイプのみを追加
     for (const channelType of CHANNEL_TYPE_DISPLAY_ORDER) {
         if (availableTypes.has(channelType)) {
-            items.push({ title: channelType, value: channelType });
+            items.push({ title: channelTypeLabel(language.value, channelType), value: channelType });
         }
     }
 
@@ -278,7 +305,7 @@ const timeItems = computed(() => {
         const displayHour = hour;
         const isEarlyHour = hour <= 12;
         items.push({
-            title: `${displayHour.toString().padStart(2, '0')}時`,
+            title: formatTimeSlotLabel(language.value, displayHour),
             value: hour,
             ...(shouldDisableEarlyHours && isEarlyHour ? { props: { disabled: true } } : {}),
         });
@@ -315,7 +342,7 @@ const formattedSelectedDate = computed(() => {
     const date = timetableStore.selected_date.add(dateDisplayOffset.value, 'day');
     const month = date.month() + 1;
     const day = date.date();
-    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date.day()];
+    const dayOfWeek = weekdayLabel(language.value, date.day());
     return `${month}/${day} (${dayOfWeek})`;
 });
 
@@ -667,6 +694,11 @@ async function onReservationDeleted(): Promise<void> {
  * @param program 番組情報
  */
 async function onQuickReserve(programId: string, channel: IChannel, program: ITimeTableProgram): Promise<void> {
+    // XMLTV の番組表には録画予約がない
+    if (isXmltv.value === true) {
+        return;
+    }
+
     // 過去番組の場合は何もしない
     const endTime = dayjs(program.end_time);
     if (endTime.isBefore(dayjs())) {
@@ -713,17 +745,35 @@ async function onQuickReserve(programId: string, channel: IChannel, program: ITi
     }
 }
 
+/**
+ * 番組表を読み込む
+ * XMLTV の URL があるときは、サーバー設定と番組表 API を呼ばない
+ */
+async function loadTimeTableForRoute(): Promise<void> {
+    if (isXmltv.value === true) {
+        await timetableStore.initialLoadXmltv();
+        return;
+    }
+    // サーバー設定を取得（バックエンド種別の判定用）
+    await serverSettingsStore.fetchServerSettingsOnce();
+    // 番組表データの初期ロード
+    await timetableStore.initialLoad();
+}
+
 // ライフサイクル
 onMounted(async () => {
     // ウィンドウリサイズイベントリスナーを登録
     // 画面回転やウィンドウサイズ変更時に、レイアウト判定の再計算をトリガーする
     window.addEventListener('resize', onWindowResize);
 
-    // サーバー設定を取得（バックエンド種別の判定用）
-    await serverSettingsStore.fetchServerSettingsOnce();
+    await loadTimeTableForRoute();
+});
 
-    // 番組表データの初期ロード
-    await timetableStore.initialLoad();
+// 表示言語を変えたときは、XMLTV の番組名と説明をその言語で取り直す
+watch(() => settingsStore.settings.ui_language, () => {
+    if (isXmltv.value === true && timetableStore.is_initial_load_completed === true) {
+        void timetableStore.fetchTimeTableData();
+    }
 });
 
 onUnmounted(() => {
@@ -814,6 +864,25 @@ watch(() => timetableStore.selected_date, () => {
 
     &--loading {
         pointer-events: none;
+    }
+}
+
+.timetable-xmltv-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    position: absolute;
+    z-index: 5;
+    inset: 0;
+    background: rgb(var(--v-theme-background));
+    user-select: none;
+
+    p {
+        margin: 0;
+        font-size: 15px;
+        color: rgb(var(--v-theme-text));
     }
 }
 
