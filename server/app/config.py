@@ -53,6 +53,7 @@ class ClientSettings(BaseModel):
     # lshaped_screen_crop_x_position: 同期無効
     # lshaped_screen_crop_y_position: 同期無効
     # lshaped_screen_crop_zoom_origin: 同期無効
+    # ui_language: 同期無効
     pinned_channel_ids: list[str] = []
     timetable_channel_width: Literal['Wide', 'Normal', 'Narrow'] = 'Normal'
     timetable_hour_height: Literal['Wide', 'Normal', 'Narrow'] = 'Normal'
@@ -76,6 +77,11 @@ class ClientSettings(BaseModel):
         '福祉': 'White',
         'その他': 'White',
     }
+    # XMLTV 番組表を取得する URL (Default: 空)
+    xmltv_epg_url: str = ''
+    # M3U プレイリストを取得する URL (Default: 空)
+    # 空のときは M3U のチャンネル一覧を読み込まない
+    m3u_playlist_url: str = ''
     show_player_background_image: bool = True
     use_pure_black_player_background: bool = False
     tv_channel_sort_by_jikkyo_force: bool = False
